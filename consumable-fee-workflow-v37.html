@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consumable Fee Change Workflow</title>
+<style>
+  :root {
+    --ivy-green: #006648;
+    --woodland-text: #2a7d30;
+    --woodland-light: #e8f7e9;
+    --quarry-text: #3a6a8a;
+    --quarry-light: #e8f1f7;
+    --tulip-text: #b34500;
+    --tulip-light: #faeae2;
+    --yellow-text: #9a6200;
+    --yellow-light: #fef6e3;
+    --peony-text: #b83228;
+    --peony-light: #fdecea;
+    --moonlight: #253959;
+    --moonlight-light: #e4e7ed;
+    --bridgeton-text: #14607a;
+    --bridgeton-light: #e3f6fc;
+    --lime-text: #4a7500;
+    --lime-light: #f0f8e3;
+    --ivy-light: #e0ede8;
+    --bg: #f4f4f2;
+    --surface: #ffffff;
+    --border: #d0d0ce;
+    --text: #1a1a1a;
+    --muted: #636363;
+    --radius: 10px;
+    --shadow: 0 2px 10px rgba(0,0,0,0.07);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 16px; line-height: 1.4; }
+  header { background: var(--ivy-green); color: #fff; padding: 18px 36px; border-bottom: 4px solid #2a7d30; }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header p { font-size: 12px; opacity: 0.9; margin-top: 3px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 36px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-dash { width: 22px; border-top: 2px dashed #999; flex-shrink: 0; }
+
+  .rationale-card { background: var(--moonlight-light); border: 1.5px solid var(--moonlight); border-radius: var(--radius); padding: 24px 28px; margin: 24px 36px; box-shadow: var(--shadow); }
+  .rationale-card h2 { font-size: 15px; font-weight: 800; color: var(--moonlight); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .rationale-section-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--moonlight); margin: 16px 0 6px; }
+  .rationale-card p { font-size: 12px; color: #2a2a2a; line-height: 1.7; margin-bottom: 8px; }
+  .scope-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+  .scope-block { border-radius: 8px; padding: 10px 13px; }
+  .scope-in { background: var(--woodland-light); border: 1px solid #41AD49; }
+  .scope-out { background: #f5f5f3; border: 1px solid var(--border); }
+  .scope-block-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .scope-in .scope-block-title { color: var(--woodland-text); }
+  .scope-out .scope-block-title { color: var(--muted); }
+  .scope-block ul { padding-left: 14px; }
+  .scope-block li { font-size: 11px; color: #2a2a2a; line-height: 1.7; }
+  .roles-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+  .roles-table th { background: var(--moonlight); color: #fff; padding: 7px 12px; text-align: left; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+  .roles-table td { padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: top; color: #2a2a2a; line-height: 1.55; }
+  .roles-table tr:last-child td { border-bottom: none; }
+  .roles-table tr:nth-child(even) td { background: #f4f6f9; }
+  .role-name { font-weight: 700; color: var(--moonlight); white-space: nowrap; }
+
+  .canvas { max-width: 980px; margin: 0 auto; padding: 12px 36px 28px; }
+  .swim-node { display: flex; gap: 0; align-items: stretch; }
+  .swim-label {
+    writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg);
+    font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #fff; padding: 8px 5px; border-radius: var(--radius) 0 0 var(--radius);
+    display: flex; align-items: center; justify-content: center; min-width: 22px; flex-shrink: 0;
+  }
+  .swim-label-setup { background: var(--moonlight); }
+  .swim-label-chair { background: var(--ivy-green); }
+  .swim-label-loop { background: var(--tulip-text); }
+  .swim-label-complete { background: var(--woodland-text); }
+  .swim-content { flex: 1; }
+  .swim-content .node { border-radius: 0 var(--radius) var(--radius) 0; }
+
+  .role-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 10px; border-radius: 6px 6px 0 0; margin-bottom: -1px; }
+  .rb-auto { background: #5a5a5a; color: #fff; }
+  .rb-approver  { background: #1a7a7a; color: #fff; }
+  .rb-revision  { background: #b34500; color: #fff; }
+  .rb-cancelled { background: #8b0000; color: #fff; }
+  .rb-complete  { background: #2a7d30; color: #fff; }
+  .rb-ghost { background: #888; color: #fff; }
+  .rb-ecampus { background: var(--moonlight); color: #fff; }
+  .rb-sol, .rb-vp, .rb-provost { background: var(--quarry-text); color: #fff; }
+  .rb-nochange { background: var(--bridgeton-text); color: #fff; }
+  .rb-success { background: var(--woodland-text); color: #fff; }
+
+  .node { border-radius: var(--radius); padding: 13px 16px; box-shadow: var(--shadow); border: 1.5px solid var(--border); background: var(--surface); }
+  .node-badged { border-radius: 0 var(--radius) var(--radius) var(--radius); }
+  .node-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
+  .node-title { font-size: 14px; font-weight: 700; line-height: 1.3; color: var(--text); }
+  .node-desc { font-size: 11px; color: var(--muted); margin-top: 5px; line-height: 1.55; }
+  .node-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .node-setup { background: var(--moonlight-light); border-color: var(--moonlight); }
+  .node-setup .node-label { color: var(--moonlight); }
+  .node-trigger { background: var(--ivy-light); border-color: var(--ivy-green); }
+  .node-trigger .node-label { color: var(--ivy-green); }
+  .node-action { background: var(--surface); border-color: var(--border); }
+  .node-action .node-label { color: var(--muted); }
+  .node-cond { background: var(--yellow-light); border-color: #e6b800; }
+  .node-cond .node-label { color: var(--yellow-text); }
+  .node-approval { background: var(--quarry-light); border-color: #7aaac8; }
+  .node-approval .node-label { color: var(--quarry-text); }
+  .node-adaptive { background: var(--moonlight-light); border-color: var(--moonlight); }
+  .node-adaptive .node-label { color: var(--moonlight); }
+  .node-ghost { background: #f8f8f6; border: 1.5px dashed #aaa; }
+  .node-ghost .node-label { color: #595959; }
+  .node-loop { background: var(--tulip-light); border-color: #c96630; }
+  .node-loop .node-label { color: var(--tulip-text); }
+  .node-success { background: var(--woodland-light); border-color: #41AD49; }
+  .node-success .node-label { color: var(--woodland-text); }
+  .node-cancel { background: var(--peony-light); border-color: #d95f50; }
+  .node-cancel .node-label { color: var(--peony-text); }
+  .node-nochange { background: var(--bridgeton-light); border-color: #52BFE3; }
+  .node-nochange .node-label { color: var(--bridgeton-text); }
+  .node-timeout-ref { background: #fffbf0; border: 1.5px solid #e6b800; border-radius: 8px; padding: 6px 12px; font-size: 11px; color: var(--yellow-text); font-weight: 600; text-align: center; margin-top: 8px; }
+  .ghost-banner { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 800; color: #595959; background: #efefed; border: 1px dashed #bbb; border-radius: 6px; padding: 3px 9px; margin-bottom: 7px; }
+  .conn-wrap { display: flex; justify-content: center; margin: 3px 0; }
+  .conn { width: 2px; height: 22px; background: #bbb; position: relative; }
+  .conn::after { content: ""; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #bbb; }
+  .branch-grid { display: grid; gap: 14px; margin: 3px 0; }
+  .branch-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .branch-2 { grid-template-columns: 1fr 1fr; }
+  .branch-col { display: flex; flex-direction: column; gap: 6px; }
+  .branch-col .role-badge, .decision-card .role-badge { margin-bottom: -7px; align-self: flex-start; }
+  .branch-hdr { text-align: center; padding: 8px 10px; border-radius: 10px; margin-bottom: 5px; border: 2px solid transparent; }
+  .branch-hdr-emoji { font-size: 18px; display: block; margin-bottom: 3px; }
+  .branch-hdr-text { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; display: block; }
+  .hdr-removal { background: var(--tulip-light); border-color: #c96630; color: var(--tulip-text); }
+  .hdr-increase { background: var(--woodland-light); border-color: #41AD49; color: var(--woodland-text); }
+  .hdr-nochange { background: var(--bridgeton-light); border-color: #52BFE3; color: var(--bridgeton-text); }
+  .hdr-cancel { background: var(--peony-light); border-color: #d95f50; color: var(--peony-text); }
+  .hdr-continue { background: var(--woodland-light); border-color: #41AD49; color: var(--woodland-text); }
+  .resp-block { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-top: 8px; }
+  .resp { border-radius: 6px; padding: 5px 4px; font-size: 11px; font-weight: 700; text-align: center; border: 1.5px solid transparent; }
+  .resp-a { background: var(--woodland-light); color: var(--woodland-text); border-color: #41AD49; }
+  .resp-c { background: var(--yellow-light); color: var(--yellow-text); border-color: #e6b800; }
+  .resp-r { background: var(--peony-light); color: var(--peony-text); border-color: #d95f50; }
+  .note { background: var(--quarry-light); border-left: 3px solid #7aaac8; border-radius: 6px; padding: 7px 11px; font-size: 11px; color: var(--quarry-text); margin-top: 8px; }
+  .counter { display: inline-flex; align-items: center; gap: 5px; background: var(--tulip-light); color: var(--tulip-text); font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 20px; margin-top: 6px; }
+  .tg { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .tg-green { background: var(--woodland-light); color: var(--woodland-text); }
+  .tg-ivy { background: var(--ivy-light); color: var(--ivy-green); }
+  .tg-grey { background: #ebebeb; color: #505050; }
+  .tg-blue { background: var(--quarry-light); color: var(--quarry-text); }
+  .tg-dark { background: var(--moonlight-light); color: var(--moonlight); }
+  .tg-orange { background: var(--tulip-light); color: var(--tulip-text); }
+  .tg-yellow { background: var(--yellow-light); color: var(--yellow-text); }
+  .tg-red { background: var(--peony-light); color: var(--peony-text); }
+  .tg-lime { background: var(--lime-light); color: var(--lime-text); }
+  .tg-cyan { background: var(--bridgeton-light); color: var(--bridgeton-text); }
+  .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
+  .field-group { background: #f6f6f4; border-radius: 7px; padding: 8px 11px; border: 1px solid var(--border); }
+  .field-group-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ivy-green); margin-bottom: 5px; }
+  .field-row { padding: 3px 0; border-bottom: 1px solid #ebebea; }
+  .field-row:last-child { border-bottom: none; }
+  .field-name { font-size: 12px; font-weight: 700; color: var(--text); }
+  .field-hint { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .divider { display: flex; align-items: center; gap: 10px; margin: 22px 0 15px; }
+  .divider-line { flex: 1; height: 2px; background: var(--ivy-light); }
+  .divider-text { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ivy-green); white-space: nowrap; }
+  .timeout-shared { background: #fffbf0; border: 1.5px solid #e6b800; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; }
+  .timeout-shared-title { font-size: 11px; font-weight: 800; color: var(--yellow-text); margin-bottom: 6px; }
+  .timeout-shared-steps { display: flex; gap: 8px; flex-wrap: wrap; }
+  .timeout-step { background: #ffffff; border: 1px solid #e6b800; border-radius: 6px; padding: 5px 10px; font-size: 11px; color: var(--yellow-text); font-weight: 600; }
+  .reject-callout { background: var(--peony-light); border: 1.5px solid #d95f50; border-radius: 8px; padding: 8px 13px; margin-top: 8px; font-size: 11px; color: var(--peony-text); font-weight: 600; }
+  .reject-callout strong { font-weight: 800; }
+  .decisions-section { background: var(--surface); border-top: 3px solid var(--ivy-green); padding: 32px 36px; }
+  .decisions-section h2 { font-size: 16px; font-weight: 800; color: var(--ivy-green); margin-bottom: 5px; }
+  .decisions-section .intro { font-size: 12px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+  .decisions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .d-group-label { font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 18px 0 8px; grid-column: 1/-1; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+  .d-card { border-radius: var(--radius); padding: 13px 14px; background: var(--surface); box-shadow: var(--shadow); border-top: 4px solid #ccc; display: flex; flex-direction: column; gap: 6px; }
+  .d-card.needs-input { border-top-color: #e6b800; }
+  .d-card.please-confirm { border-top-color: #7aaac8; }
+  .d-card.in-progress { border-top-color: var(--ivy-green); }
+  .d-card-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .d-num { font-size: 11px; font-weight: 800; color: var(--muted); }
+  .d-badge { font-size: 10px; font-weight: 800; padding: 2px 9px; border-radius: 20px; }
+  .badge-input { background: var(--yellow-light); color: var(--yellow-text); }
+  .badge-confirm { background: var(--quarry-light); color: var(--quarry-text); }
+  .badge-progress { background: var(--ivy-light); color: var(--ivy-green); }
+  .d-title { font-size: 12px; font-weight: 700; color: var(--text); }
+  .d-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .spacer { height: 28px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Consumable Fee Change Workflow</h1>
+  <p>Process wireframe for review · Ivy Tech Community College · Academic Year Fee Approval Flow</p>
+</header>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#006648"></div> Trigger / Start</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#253959"></div> Setup Step</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#9a6200"></div> Decision Point</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3a6a8a"></div> Confirmed Approval</div>
+  <div class="legend-item"><div class="legend-dash"></div><span>Possible Step (Needs Decision)</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:#b34500"></div> Revision / Loop</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2a7d30"></div> Completion</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#b83228"></div> Cancellation / Reject</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#14607a"></div> No Change Path</div>
+</div>
+
+<div class="rationale-card">
+  <h2>About This Workflow</h2>
+  <div class="rationale-section-title">A. Purpose</div>
+  <p>This workflow replaces the previous DocuSign-based consumable fee change process with a Power Automate flow built entirely on Microsoft 365 tools already licensed by Ivy Tech Community College. The previous process presented several challenges: limited flexibility in form design, no built-in mechanism to send requests back for revision, difficulty tracking where a request stood at any given point, inconsistent storage and retrieval of finalized approval documents, and limited visibility and transparency for all parties involved. Data accuracy was also difficult to verify, as the process relied on manual entry across disconnected steps.</p>
+  <p>This flow addresses those challenges by centralizing submission, routing, approvals, revision tracking, and document generation in a single connected system. Approvers receive consistent notifications with the supporting document attached at every step. The status of any request is visible at any time through the SharePoint list and available for reporting. Campus-based fee distribution, including through the bookstore, is included in scope.</p>
+  <p>Because this flow is built on Microsoft SharePoint, Power Automate, Microsoft Forms, and Microsoft Teams, which are part of Ivy Tech's existing licensing and are not likely to be replaced in the near future, it offers long-term sustainability. The flow is designed to require minimal ongoing maintenance once built, supported by documentation and a testing protocol managed by the process designer.</p>
+
+  <div class="rationale-section-title">B. Scope</div>
+  <div class="scope-grid">
+    <div class="scope-block scope-in">
+      <div class="scope-block-title">Included in This Flow</div>
+      <ul>
+        <li>New fee submissions</li>
+        <li>Fee increase requests</li>
+        <li>Fee decrease requests</li>
+        <li>Fee removal requests</li>
+        <li>Annual SharePoint list setup and population</li>
+        <li>Document generation and storage</li>
+        <li>Reporting data (Power BI and Finance exports)</li>
+      </ul>
+    </div>
+    <div class="scope-block scope-out">
+      <div class="scope-block-title">Out of Scope / Handled Separately</div>
+      <ul>
+        <li>No-Change records (pre-loaded, no approval flow triggered)</li>
+        <li>Fee implementation in the student information system</li>
+        <li>External vendor contract management</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="rationale-section-title">C. Key Roles</div>
+  <table class="roles-table">
+    <thead>
+      <tr><th>Role</th><th>Responsibilities in This Flow</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><div class="role-name">Curriculum Committee Chair / Vice Chair</div></td><td>Originates fee change requests by submitting the Microsoft Form. Receives revision requests and resubmits corrected information. Receives final approval or rejection notification.</td></tr>
+      <tr><td><div class="role-name">Systems Office Liaison (SOL)</div></td><td>First formal approver for all change types. Reviews submitted fee details and supporting documentation. Manually reviews No-Change records outside the flow.</td></tr>
+      <tr><td><div class="role-name">School Vice President</div></td><td>Second formal approver for New Fee and Increase submissions. Tied to the committee by school. Approval required before Provost review.</td></tr>
+      <tr><td><div class="role-name">Provost</div></td><td>Final formal approver for all New Fee and Increase submissions. Receives the fully reviewed package including all prior approvals and supporting documentation.</td></tr>
+      <tr><td><div class="role-name">eCampus</div></td><td>Enters final cost per student and processing notes via a structured Teams card when the distributor is eCampus. Data is written to the SharePoint record and included in the final document.</td></tr>
+      <tr><td><div class="role-name">Testing Center (Pending Decision)</div></td><td>May have a conditional review step for fees distributed through the Testing Center. Decision on approval versus notification is pending. See Decision D1.</td></tr>
+      <tr><td><div class="role-name">OIT (Pending Decision)</div></td><td>May have a conditional review step for fees distributed through Shared Services Software. Decision pending. See Decision D3.</td></tr>
+      <tr><td><div class="role-name">Central Account Administrator (Pending Decision)</div></td><td>Role in the flow for fees routed to a Central Account has not yet been defined. See Decision D4.</td></tr>
+      <tr><td><div class="role-name">Process Designer / Maintainer</div></td><td>Builds, tests, and documents the flow. Runs the annual setup flow to create the new SharePoint list and update form dropdowns. Manages ongoing maintenance and iteration.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="canvas">
+  <div class="divider"><div class="divider-line"></div><div class="divider-text">Stage 0 : Annual Setup</div><div class="divider-line"></div></div>
+  <div class="node node-setup">
+        <div class="node-label">⚙️ Setup Flow : Run Once Per Academic Year by Process Designer</div>
+        <div class="node-title">Prepare the SharePoint List and Submission Form</div>
+        <div class="node-desc">The process designer runs a setup flow at the start of each academic year cycle. This creates a fresh SharePoint list pre-loaded with all fee lines from the prior year, assigns each fee line a unique identifier, and automatically updates the submission form dropdown. No-Change records are included in the list for reporting but will not trigger an approval flow.</div>
+        <div class="fields-grid">
+          <div class="field-group">
+            <div class="field-group-title">What Gets Created</div>
+            <div class="field-row"><div class="field-name">New SharePoint list for the academic year</div></div>
+            <div class="field-row"><div class="field-name">One record per fee line</div></div>
+            <div class="field-row"><div class="field-name">Unique Identifier Per Fee Line</div><div class="field-hint">Suggested format: [AY]-[Prefix+Number]-[Seq] such as 2627-ACCT122-01. Short, readable, and easy to search. Format confirmed during build phase.</div></div>
+            <div class="field-row"><div class="field-name">Form Dropdown Auto-Updated</div><div class="field-hint">Searchable: chairs type the course prefix to filter quickly</div></div>
+          </div>
+          <div class="field-group">
+            <div class="field-group-title">Pre-Loaded Fields Per Record</div>
+            <div class="field-row"><div class="field-name">Course Prefix, Number, and Name</div></div>
+            <div class="field-row"><div class="field-name">Prior Year Approved Fee</div></div>
+            <div class="field-row"><div class="field-name">Fee Type and Description</div></div>
+            <div class="field-row"><div class="field-name">Fee Distribution Channel</div></div>
+          </div>
+        </div>
+        <div class="node-tags" style="margin-top:9px">
+          <span class="tg tg-dark">New List Per Academic Year</span>
+          <span class="tg tg-dark">Form Choices Auto-Updated by Flow</span>
+          <span class="tg tg-cyan">No-Change Records Included for Reporting</span>
+        </div>
+  </div>
+
+  <div class="divider"><div class="divider-line"></div><div class="divider-text">Stage 1 : Submission</div><div class="divider-line"></div></div>
+  <div class="node node-trigger">
+        <div class="node-label">🟢 Trigger : Microsoft Form Submitted by Curriculum Committee Chair or Vice Chair</div>
+        <div class="node-title">Fee Change Request Form</div>
+        <div class="node-desc">The Committee Chair selects their fee line from a searchable dropdown. MS Forms supports search-as-you-type, so the Chair types the course prefix to filter the list instantly. The form auto-fills known information from the SharePoint list. The Chair completes remaining fields and submits.</div>
+        <div class="fields-grid">
+          <div class="field-group">
+            <div class="field-group-title">Course Information</div>
+            <div class="field-row"><div class="field-name">Fee Line Identifier</div><div class="field-hint">Searchable dropdown. Type course prefix to filter.</div></div>
+            <div class="field-row"><div class="field-name">Course Prefix, Number, and Name</div><div class="field-hint">Auto-filled from SharePoint list</div></div>
+            <div class="field-row"><div class="field-name">Academic Year</div><div class="field-hint">Dropdown (e.g., 26-27, 27-28)</div></div>
+            <div class="field-row"><div class="field-name">Prior Year Approved Fee</div><div class="field-hint">Auto-filled from SharePoint list</div></div>
+          </div>
+          <div class="field-group">
+            <div class="field-group-title">Fee Details</div>
+            <div class="field-row"><div class="field-name">Change Type</div><div class="field-hint">New Fee / Increase / Decrease / Removal</div></div>
+            <div class="field-row"><div class="field-name">Proposed Fee Amount</div></div>
+            <div class="field-row"><div class="field-name">Item Title and Description</div></div>
+            <div class="field-row"><div class="field-name">Item Vendor</div><div class="field-hint">Who creates or sells the item</div></div>
+            <div class="field-row"><div class="field-name">Distributor</div><div class="field-hint">eCampus / Testing Center / Direct from Vendor / Central Account / OIT / Other (describe)</div></div>
+            <div class="field-row"><div class="field-name">Fee Distribution</div><div class="field-hint">Campus / IvyOnline / Central</div></div>
+          </div>
+          <div class="field-group">
+            <div class="field-group-title">Instructional Methods with Fee</div>
+            <div class="field-row"><div class="field-name">Select methods where fee applies</div><div class="field-hint">TR: Traditional / BT: Blended / LA: Learn Anywhere / I: Online / V: Virtual / None</div></div>
+          </div>
+          <div class="field-group">
+            <div class="field-group-title">Fee Justification</div>
+            <div class="field-row"><div class="field-name">Rationale for New or Increased Fee</div></div>
+            <div class="field-row"><div class="field-name">Additional Notes</div></div>
+          </div>
+          <div class="field-group" style="grid-column:1/-1">
+            <div class="field-group-title">U.S. Dept. of Education Scenarios : At Least One Required</div>
+            <div class="field-row"><div class="field-name">Scenario 1: Below Market Rate</div><div class="field-hint">Yes / No, plus supporting explanation if Yes</div></div>
+            <div class="field-row"><div class="field-name">Scenario 2: Not Available Elsewhere</div><div class="field-hint">Yes / No, plus supporting explanation if Yes</div></div>
+            <div class="field-row"><div class="field-name">Scenario 3: Health and Safety</div><div class="field-hint">Yes / No, plus supporting explanation if Yes</div></div>
+          </div>
+          <div class="field-group" style="grid-column:1/-1">
+            <div class="field-group-title">Approver Information (Current Version)</div>
+            <div class="field-row"><div class="field-name">Systems Office Liaison Name and Email</div><div class="field-hint">Entered by Chair. Future upgrade: pulled automatically from committee lookup table.</div></div>
+            <div class="field-row"><div class="field-name">School Vice President Name and Email</div><div class="field-hint">Entered by Chair with validation. Same future upgrade planned.</div></div>
+          </div>
+        </div>
+        <div class="node-tags" style="margin-top:9px">
+          <span class="tg tg-ivy">Microsoft Forms</span>
+          <span class="tg tg-grey">Searchable Fee Line Dropdown</span>
+          <span class="tg tg-yellow">Chair Enters Approver Name and Email</span>
+          <span class="tg tg-green">Future Upgrade: Auto Lookup by Committee</span>
+        </div>
+  </div>
+
+  <div class="conn-wrap"><div class="conn"></div></div>
+  <div class="role-badge rb-auto">Automation</div>
+  <div class="node node-action node-badged">
+    <div class="node-label">⚙️ Action</div>
+    <div class="node-title">Match Submission to List Record and Calculate Fee Changes</div>
+    <div class="node-desc">The flow finds the matching fee line in the SharePoint list using the identifier, writes all submitted data, and automatically calculates the Fee Change Amount (proposed minus prior year) and the Proposed Course Fee Total. Status is set to "Pending Approval" and the send-back counter starts at zero.</div>
+    <div class="node-tags">
+      <span class="tg tg-grey">SharePoint Record Updated</span>
+      <span class="tg tg-lime">Fee Change Amount Calculated</span>
+      <span class="tg tg-lime">Course Fee Total Calculated</span>
+      <span class="tg tg-yellow">Status: Pending Approval</span>
+      <span class="tg tg-red">Send-Back Counter: 0</span>
+    </div>
+  </div>
+
+  <div class="conn-wrap"><div class="conn"></div></div>
+  <div class="role-badge rb-auto">Automation</div>
+  <div class="node node-action node-badged">
+    <div class="node-label">📄 Action</div>
+    <div class="node-title">Generate Preview Document</div>
+    <div class="node-desc">Word document generated from all submitted and calculated data using a template (design in progress). Saved as draft to Document Library. Attached to every approval notification.</div>
+    <div class="node-tags">
+      <span class="tg tg-grey">Word Template (Design in Progress)</span>
+      <span class="tg tg-yellow">Saved as Draft</span>
+      <span class="tg tg-ivy">Includes DoE Justification Text</span>
+      <span class="tg tg-ivy">Attached to All Approval Notifications</span>
+    </div>
+  </div>
+
+  <div class="divider"><div class="divider-line"></div><div class="divider-text">Stage 2 : Approval Routing</div><div class="divider-line"></div></div>
+  <div style="background:#fffbf0;border:1.5px solid #e6b800;border-radius:10px;padding:10px 16px;margin-bottom:14px;font-size:11px;color:#9a6200;">
+    <strong>Timeout and Rejection Rules — apply to every approval step in Stage 2:</strong> Approvers have 48–72 business hours to respond. No response triggers one reminder, then the submission is treated as "Request Changes" and returned to the Chair. A hard rejection cancels the flow immediately — Chair and SOL are notified with the rejection reason, and the record is marked "Rejected" in SharePoint. See the Systems Office Liaison box below for the full response pattern.
+  </div>
+
+  <div class="role-badge rb-auto">Automation</div>
+  <div class="node node-cond node-badged">
+    <div class="node-label">🔀 Branch Point</div>
+    <div class="node-title">What type of change was submitted?</div>
+    <div class="node-desc">The flow reads the Change Type and routes down one of three paths. No-Change records are loaded in Stage 0 and never reach this point.</div>
+  </div>
+
+  <div class="conn-wrap"><div class="conn"></div></div>
+  <div class="branch-grid branch-3" style="gap:10px; margin-top:12px;">
+    <div class="branch-col">
+      <div class="node node-nochange">
+        <div class="node-label">🔒 No Approval Flow</div>
+        <div class="node-title">SOL Manual Review</div>
+        <div class="node-desc">Records pre-loaded in Stage 0. No approval flow triggered. SOL reviews manually. Visible in reporting.</div>
+        <div class="node-tags"><span class="tg tg-cyan">Status: No Change</span><span class="tg tg-blue">SOL Reviews Outside Flow</span></div>
+      </div>
+    </div>
+
+    <div class="branch-col">
+      <div class="branch-hdr hdr-removal"><span class="branch-hdr-emoji">⬇️</span><span class="branch-hdr-text">Fee Removal or Decrease</span></div>
+      <div class="node node-approval">
+        <div class="node-label">✅ Step 1 of 1</div>
+        <div class="node-title">Systems Office Liaison Review</div>
+        <div class="node-desc">SOL receives Teams message and email with the preview document attached.</div>
+        <div class="resp-block"><div class="resp resp-a">Approve</div><div class="resp resp-c">Request Changes</div><div class="resp resp-r">Reject</div></div>
+        <div class="reject-callout"><strong>If Rejected:</strong> Flow cancels immediately. Chair and SOL notified with rejection reason. Record marked "Rejected" in SharePoint.</div>
+        <div class="node-timeout-ref">Standard timeout rules apply</div>
+      </div>
+      <div class="conn-wrap" style="margin:5px 0"><div class="conn"></div></div>
+      <div class="node node-success">
+        <div class="node-label">✅ Complete</div>
+        <div class="node-title">Approved</div>
+        <div class="node-desc">Record updated. Document finalized. Chair and SOL notified by email.</div>
+      </div>
+    </div>
+
+    <div class="branch-col">
+      <div class="branch-hdr hdr-increase"><span class="branch-hdr-emoji">⬆️</span><span class="branch-hdr-text">New Fee or Increase</span></div>
+      <div style="border:1.5px dashed #aaa;border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;background:#fafaf8;">
+        <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px;">Conditional Distributor Steps — New Fee and Increase Only</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <div class="role-badge rb-ghost">D1</div>
+            <div class="node node-ghost node-badged">
+              <div class="ghost-banner">⬡ Possible Step</div>
+              <div class="node-label">❓ Testing Center Review</div>
+              <div class="node-title">Executive Director Testing Services</div>
+              <div class="node-desc">Conditional if Distributor is Testing Center. Approval vs. notification TBD.</div>
+              <div class="node-tags"><span class="tg tg-yellow">If Distributor: Testing Center</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="role-badge rb-ghost">D3</div>
+            <div class="node node-ghost node-badged">
+              <div class="ghost-banner">⬡ Possible Step</div>
+              <div class="node-label">❓ OIT Review</div>
+              <div class="node-title">OIT</div>
+              <div class="node-desc">Conditional if Distributor is OIT. Software availability confirmation TBD.</div>
+              <div class="node-tags"><span class="tg tg-yellow">If Distributor: OIT</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="role-badge rb-ghost">D4</div>
+            <div class="node node-ghost node-badged">
+              <div class="ghost-banner">⬡ Possible Step</div>
+              <div class="node-label">❓ Central Account</div>
+              <div class="node-title">Central Account Administrator</div>
+              <div class="node-desc">Conditional if Distributor is Central Account. Handling process TBD.</div>
+              <div class="node-tags"><span class="tg tg-yellow">If Distributor: Central Account</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="role-badge rb-ghost">D2 · D7</div>
+            <div class="node node-ghost node-badged">
+              <div class="ghost-banner">⬡ Possible Step</div>
+              <div class="node-label">❓ Finance Review</div>
+              <div class="node-title">Finance Review</div>
+              <div class="node-desc">Finance currently reviews outside the flow. Formal step may improve accuracy for high-dollar fees.</div>
+              <div class="node-tags"><span class="tg tg-yellow">Decision D2</span><span class="tg tg-yellow">Decision D7</span></div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div class="node node-adaptive">
+            <div class="node-label">🔷 Data Entry · eCampus Only</div>
+            <div class="node-title">eCampus Enters Cost via Teams</div>
+            <div class="node-desc">eCampus receives a structured Teams card to enter final cost per student and processing notes. Skipped if Distributor is not eCampus.</div>
+            <div class="node-tags"><span class="tg tg-dark">Cost Per Student (required)</span><span class="tg tg-dark">Processing Notes</span><span class="tg tg-orange">If Distributor: eCampus Only</span></div>
+            <div class="node-timeout-ref">Timeout: 48 business hours, one reminder, then flow pauses and Chair/SOL are notified to follow up directly.</div>
+          </div>
+        </div>
+      </div>
+      <div class="conn-wrap conn-tight"><div class="conn"></div></div>
+      <div class="node node-approval">
+        <div class="node-label">✅ Step 1 of 3</div>
+        <div class="node-title">Systems Office Liaison Review</div>
+        <div class="node-desc">Receives Teams card and email with the preview document and all prior reviewer inputs attached.</div>
+        <div class="resp-block"><div class="resp resp-a">Approve</div><div class="resp resp-c">Request Changes</div><div class="resp resp-r">Reject</div></div>
+      </div>
+      <div class="conn-wrap" style="margin:5px 0"><div class="conn"></div></div>
+      <div class="node node-approval">
+        <div class="node-label">✅ Step 2 of 3</div>
+        <div class="node-title">School Vice President Review</div>
+        <div class="node-desc">Receives Teams card and email with the preview document and all prior reviewer inputs attached.</div>
+        <div class="resp-block"><div class="resp resp-a">Approve</div><div class="resp resp-c">Request Changes</div><div class="resp resp-r">Reject</div></div>
+      </div>
+      <div class="conn-wrap" style="margin:5px 0"><div class="conn"></div></div>
+      <div class="node node-approval">
+        <div class="node-label">✅ Step 3 of 3</div>
+        <div class="node-title">Provost Review</div>
+        <div class="node-desc">Receives the fully reviewed package: all prior approvals, reviewer inputs, and the final preview document.</div>
+        <div class="resp-block"><div class="resp resp-a">Approve</div><div class="resp resp-c">Request Changes</div><div class="resp resp-r">Reject</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="divider"><div class="divider-line"></div><div class="divider-text">Stage 3 : Revision Loop</div><div class="divider-line"></div></div>
+  <div class="node node-loop">
+    <div class="node-label">🔁 Sent Back to Chair</div>
+        <div class="node-title">Submission Sent Back to the Chair</div>
+        <div class="node-desc">Approver comments sent to Chair by email and Teams. Chair corrects and resubmits using the same identifier. Preview document regenerates and the approval chain restarts.</div>
+        <div class="counter">⚠️ Send-Back Counter Increases by 1</div>
+        <div class="node-tags" style="margin-top:8px"><span class="tg tg-orange">Approver Comments Sent to Chair</span><span class="tg tg-orange">Email and Teams Notification</span><span class="tg tg-yellow">Status: Revisions Requested</span></div>
+  </div>
+
+  <div class="conn-wrap"><div class="conn"></div></div>
+  <div class="role-badge rb-auto">Automation</div>
+  <div class="node node-cond node-badged">
+    <div class="node-label">🔀 Branch Point</div>
+    <div class="node-title">Has this been sent back 3 times?</div>
+    <div class="node-desc">The flow checks the total send-back count. If the limit is reached, the flow is cancelled and must be restarted with a new submission.</div>
+  </div>
+
+  
+  <div class="conn-wrap"><div class="conn"></div></div>
+  <div class="branch-grid branch-2">
+    <div class="branch-col">
+      <div class="branch-hdr hdr-cancel"><span class="branch-hdr-emoji">🚫</span><span class="branch-hdr-text">3 Send-Backs Reached</span></div>
+      <div class="node node-cancel">
+        <div class="node-label">🚫 Cancelled</div>
+        <div class="node-title">Submission Must Be Restarted</div>
+        <div class="node-desc">Record marked "Cancelled: Restart Required." Chair and SOL notified. A new form submission is required.</div>
+        <div class="node-tags"><span class="tg tg-red">Status: Cancelled : Restart Required</span><span class="tg tg-red">Chair and SOL Notified</span></div>
+      </div>
+    </div>
+    <div class="branch-col">
+      <div class="branch-hdr hdr-continue"><span class="branch-hdr-emoji">🔄</span><span class="branch-hdr-text">Under 3 Send-Backs</span></div>
+      <div class="node node-loop">
+        <div class="node-label">🔁 Revise &amp; Resubmit</div>
+        <div class="node-title">Corrections Made : Approval Chain Restarts</div>
+        <div class="node-desc">Chair reviews feedback, corrects, and resubmits using the same identifier. Preview regenerates, approval chain restarts, send-back count preserved.</div>
+        <div class="node-tags"><span class="tg tg-orange">Preview Document Regenerated</span><span class="tg tg-orange">Approval Chain Restarts</span><span class="tg tg-yellow">Send-Back Count Preserved</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"><div class="divider-line"></div><div class="divider-text">Stage 4 : Completion</div><div class="divider-line"></div></div>
+  <div class="role-badge rb-auto">Automation</div>
+  <div class="node node-action node-badged">
+    <div class="node-label">⚙️ Action</div>
+    <div class="node-title">Finalize the Document</div>
+    <div class="node-desc">Draft document updated with approver names, dates, and eCampus cost if applicable. Status changes from Draft to Final. See D9 for version retention decision.</div>
+    <div class="node-tags"><span class="tg tg-grey">Approver Names and Dates Added</span><span class="tg tg-ivy">Status: Final</span><span class="tg tg-yellow">See D9 for Version Retention Decision</span></div>
+  </div>
+
+  <div class="conn-wrap"><div class="conn"></div></div>
+  <div class="role-badge rb-auto">Automation</div>
+  <div class="node node-action node-badged">
+    <div class="node-label">⚙️ Action</div>
+    <div class="node-title">Write Approval Data to SharePoint List</div>
+    <div class="node-desc">Full approval record written to SharePoint: approver names, dates, final fee amounts, eCampus cost if applicable, and DoE scenario responses. Feeds Finance export and Power BI.</div>
+    <div class="node-tags"><span class="tg tg-grey">Full Approval Record Saved</span><span class="tg tg-lime">Final Fee Amounts Recorded</span><span class="tg tg-ivy">Finance Export Ready</span><span class="tg tg-blue">Power BI Dashboard Updated</span></div>
+  </div>
+
+  <div class="conn-wrap"><div class="conn"></div></div>
+  <div class="role-badge rb-complete">Complete</div>
+  <div class="node node-success node-badged">
+    <div class="node-label">✅ Flow Complete</div>
+    <div class="node-title">Approval Complete : Notifications Sent</div>
+    <div class="node-desc">Chair, SOL, School VP, and Provost receive a completion email with a direct link to the finalized document.</div>
+    <div class="node-tags"><span class="tg tg-green">Email to Chair, SOL, School VP, and Provost</span><span class="tg tg-green">Link to Final Document</span><span class="tg tg-green">Status: Approved</span></div>
+  </div>
+  <div class="spacer"></div>
+</div>
+
+<div class="decisions-section">
+  <h2>Items for Reviewer Input</h2>
+  <p class="intro">The following items require decisions before the flow can be fully built. Items are grouped by topic. Dashed-border steps in the flow above correspond to decisions marked "Needs Your Input."</p>
+  <div class="decisions-grid">
+    <div class="d-group-label">Approval Chain</div>
+    <div class="d-card needs-input"><div class="d-card-top"><div class="d-num">D1</div><div class="d-badge badge-input">Needs Your Input</div></div><div class="d-title">Testing Center Review Step</div><div class="d-desc">Several fees are distributed through the Testing Center. Should the Executive Director Testing Services have a conditional review step? If so, should it be a formal approval or a notification only?</div></div>
+    <div class="d-card please-confirm"><div class="d-card-top"><div class="d-num">D2</div><div class="d-badge badge-confirm">Please Confirm</div></div><div class="d-title">Finance Formal Step</div><div class="d-desc">Finance currently reviews final data outside the flow. The current plan does not include a Finance approval step. Reviewers should confirm this is acceptable or decide if adding a step would improve accuracy.</div></div>
+    <div class="d-card needs-input"><div class="d-card-top"><div class="d-num">D3</div><div class="d-badge badge-input">Needs Your Input</div></div><div class="d-title">OIT Review Step</div><div class="d-desc">Some fees are fulfilled through OIT Shared Services Software such as Adobe. Should OIT have a conditional review step when the distributor is OIT, similar to how eCampus is handled?</div></div>
+    <div class="d-card needs-input"><div class="d-card-top"><div class="d-num">D4</div><div class="d-badge badge-input">Needs Your Input</div></div><div class="d-title">Central Account Process</div><div class="d-desc">Several fees route to a Central Account administrator. Should this be a notification step, a formal approval, or handled entirely outside the flow?</div></div>
+
+    <div class="d-group-label">Form and Data</div>
+    <div class="d-card needs-input"><div class="d-card-top"><div class="d-num">D5</div><div class="d-badge badge-input">Needs Your Input</div></div><div class="d-title">Item Vendor Field Format</div><div class="d-desc">Should Item Vendor be a free-text field or a managed dropdown? A dropdown reduces errors but requires maintenance. Free text is simpler but may lead to inconsistencies across submissions.</div></div>
+    <div class="d-card in-progress"><div class="d-card-top"><div class="d-num">D6</div><div class="d-badge badge-progress">Confirmed</div></div><div class="d-title">Approver Entry Method</div><div class="d-desc">Confirmed: the Chair enters approver contact information on the form in the current version. A future upgrade will pull this automatically from a committee lookup table.</div></div>
+
+    <div class="d-group-label">Special Cases</div>
+    <div class="d-card needs-input"><div class="d-card-top"><div class="d-num">D7</div><div class="d-badge badge-input">Needs Your Input</div></div><div class="d-title">High-Dollar or Third-Party Fees</div><div class="d-desc">Some third-party vendor fees reach very high amounts, such as flight training programs above $30,000. Should fees above a defined dollar threshold trigger an additional review step or a different handling process?</div></div>
+
+    <div class="d-group-label">Documents and Records</div>
+    <div class="d-card in-progress"><div class="d-card-top"><div class="d-num">D8</div><div class="d-badge badge-progress">In Progress</div></div><div class="d-title">Document Template Design</div><div class="d-desc">The Word document template for generated approval records is being designed based on an existing version. Must include fee details, DoE scenario justifications, approval information, and metadata. Owner and target completion date to be confirmed before external review.</div></div>
+    <div class="d-card needs-input"><div class="d-card-top"><div class="d-num">D9</div><div class="d-badge badge-input">Needs Your Input</div></div><div class="d-title">Draft Version Retention</div><div class="d-desc">If a submission goes through multiple revision cycles, should each draft document version be kept in the Document Library, or only the final approved version?</div></div>
+    <div class="d-card needs-input"><div class="d-card-top"><div class="d-num">D10</div><div class="d-badge badge-input">Needs Your Input</div></div><div class="d-title">Who Can Issue a Hard Reject</div><div class="d-desc">A hard reject cancels the flow immediately and cannot be revised or resubmitted without starting over. Should this option be available to all approvers at every step, or should it be restricted to specific roles such as the Provost or SOL only?</div></div>
+  </div>
+</div>
+</body>
+</html>
